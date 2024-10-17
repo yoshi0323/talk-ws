@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-const ScenarioForm = ({ headers, scenarioId, deleteScenario }) => {
+const ScenarioForm = ({ headers, data, scenarioId, deleteScenario }) => {
   const [selectedField, setSelectedField] = useState('');
   const [requiredInfo, setRequiredInfo] = useState('');
   const [conditionOperator, setConditionOperator] = useState('equals');
   const [scenarioInput, setScenarioInput] = useState('');
   const [isExpanded, setIsExpanded] = useState(true);  // トグルの開閉状態
   const [nestedScenarios, setNestedScenarios] = useState([]);  // ネストされたシナリオ
+  const [response, setResponse] = useState(''); // シナリオの回答
 
   // 入力フィールドの変更ハンドラー
   const handleFieldChange = (event) => {
@@ -34,6 +35,73 @@ const ScenarioForm = ({ headers, scenarioId, deleteScenario }) => {
     const newScenarioId = nestedScenarios.length + 1;
     setNestedScenarios([...nestedScenarios, { id: newScenarioId }]);
   };
+
+  // データ処理の関数
+  const processData = (data) => {
+    if (!data || data.length === 0) return; // dataが未定義または空の場合は処理を中止
+
+    const row = data[0]; // 最初の行を処理
+    const bvIndex = headers.indexOf('BV');
+    const kIndex = headers.indexOf('K');
+    const bwIndex = headers.indexOf('BW');
+    const bxIndex = headers.indexOf('BX');
+    const bzIndex = headers.indexOf('BZ');
+    const caIndex = headers.indexOf('CA');
+    const cbIndex = headers.indexOf('CB');
+    const ccIndex = headers.indexOf('CC');
+    const aaIndex = headers.indexOf('AA');
+
+    let responseText = '';
+
+    // BVの値に基づく処理
+    if (row[bvIndex] === '1') {
+      responseText = `配送日は${row[kIndex]}です。`;
+    } else if (row[bvIndex] === '2') {
+      responseText = `配送日は${row[kIndex]}ですが、確定ではありません。確定しますか？`;
+    }
+
+    // 配送時間の確認
+    if (row[bwIndex] && row[bwIndex] !== 'OK' && row[bwIndex] !== 'NG' && row[bwIndex] !== '未') {
+      responseText += ` 配送予定時間は${row[bwIndex]}～${row[bxIndex]}です。`;
+    } else {
+      responseText += ' 配送時間が決まっておりません。';
+    }
+
+    // 特定の行の処理（例：677行目）
+    if (data.indexOf(row) === 676) { // 0-indexedなので676
+      responseText += ' 11:00~14:00の間で配送予定です。';
+    }
+
+    // 配送日の変更
+    if (row[bzIndex]) {
+      responseText += ` ${row[bzIndex]}以降の曜日で回答可能です。`;
+      if (row[caIndex]) {
+        responseText += `ただし${row[caIndex]}の曜日には配送ができません。`;
+      }
+    }
+
+    // 配送オプション
+    if (row[aaIndex] === '1') {
+      responseText += ` 配送オプション: ${row[cbIndex] === '1' ? '玄関渡し' : '開梱'}`;
+    }
+
+    // AA列の値に基づく条件分岐
+    if (row[aaIndex] === '0') {
+      responseText += ' 配送オプションはありません。';
+    }
+
+    // &シナリオの処理
+    if (scenarioInput === 'input' && row[bvIndex] === '1') {
+      responseText += ` 変数B: ${row[kIndex]}が配送日となります。`;
+    }
+
+    setResponse(responseText);
+  };
+
+  // データが変更されたときに処理を実行
+  useEffect(() => {
+    processData(data); // dataを引数として渡す
+  }, [data]);
 
   return (
     <div className="scenario-form">
@@ -96,6 +164,7 @@ const ScenarioForm = ({ headers, scenarioId, deleteScenario }) => {
             <ScenarioForm
               key={nestedScenario.id}
               headers={headers}
+              data={data} // dataを渡す
               scenarioId={`${scenarioId}-${nestedScenario.id}`}
               deleteScenario={() => setNestedScenarios(nestedScenarios.filter(s => s.id !== nestedScenario.id))}
             />
@@ -114,6 +183,12 @@ const ScenarioForm = ({ headers, scenarioId, deleteScenario }) => {
                 </button>
               </>
             )}
+          </div>
+
+          {/* シナリオの回答表示 */}
+          <div>
+            <h4>シナリオの回答:</h4>
+            <p>{response}</p>
           </div>
         </div>
       )}
