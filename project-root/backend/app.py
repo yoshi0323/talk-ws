@@ -1,23 +1,37 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import csv
+const express = require('express');
+const { VoiceResponse } = require('twilio').twiml;
+const bodyParser = require('body-parser');
+const app = express();
+app.use(bodyParser.urlencoded({ extended: false }));
 
-app = Flask(__name__)
-CORS(app)  # ReactとのCORSを許可
+// CSVデータの取り込み (mock function)
+const csvData = [
+  { BV: '1', K: '2024-10-25', BW: '11:00', BX: '14:00' },
+  { BV: '2', K: '2024-10-30', BW: '', BX: '' },
+];
 
-@app.route('/upload', methods=['POST'])
-def upload_csv():
-    file = request.files['file']
-    filepath = f"uploads/{file.filename}"
-    file.save(filepath)
-    headers = get_csv_headers(filepath)
-    return jsonify({"headers": headers})
+app.post('/voice', (req, res) => {
+  const twiml = new VoiceResponse();
+  const selectedRow = csvData[0]; // 仮に1行目を選択
 
-def get_csv_headers(filepath):
-    with open(filepath, 'r') as f:
-        reader = csv.reader(f)
-        headers = next(reader)  # 最初の行（ヘッダー）を取得
-    return headers
+  // BVが1の場合、配送日を回答
+  if (selectedRow.BV === '1') {
+    twiml.say(`配送日は${selectedRow.K}です。`);
+  } else if (selectedRow.BV === '2') {
+    twiml.say(`配送日は${selectedRow.K}です。確定しますか？`);
+  }
 
-if __name__ == "__main__":
-    app.run(debug=True)
+  // BWとBXの配送時間
+  if (selectedRow.BW && selectedRow.BX) {
+    twiml.say(`配送時間は${selectedRow.BW}から${selectedRow.BX}です。`);
+  } else {
+    twiml.say('配送時間が決まっておりません。');
+  }
+
+  res.type('text/xml');
+  res.send(twiml.toString());
+});
+
+app.listen(3000, () => {
+  console.log('Listening on port 3000');
+});
