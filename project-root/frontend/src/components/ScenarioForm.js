@@ -8,6 +8,9 @@ const ScenarioForm = ({ headers, data, scenarioId, deleteScenario }) => {
   const [isExpanded, setIsExpanded] = useState(true);  // トグルの開閉状態
   const [nestedScenarios, setNestedScenarios] = useState([]);  // ネストされたシナリオ
   const [response, setResponse] = useState(''); // シナリオの回答
+  const [variables, setVariables] = useState({}); // 変数を管理するための状態
+  const [selectedVariable, setSelectedVariable] = useState(''); // 選択された変数
+  const [manualInput, setManualInput] = useState(''); // 手入力用の状態
 
   // 入力フィールドの変更ハンドラー
   const handleFieldChange = (event) => {
@@ -36,6 +39,17 @@ const ScenarioForm = ({ headers, data, scenarioId, deleteScenario }) => {
     setNestedScenarios([...nestedScenarios, { id: newScenarioId }]);
   };
 
+  // 変数の変更ハンドラー
+  const handleVariableChange = (value) => {
+    setSelectedVariable(value);
+    setManualInput(''); // プルダウン選択時に手入力をクリア
+  };
+
+  const handleVariableInputChange = (event) => {
+    setManualInput(event.target.value);
+    setSelectedVariable(''); // 手入力時にプルダウン選択をクリア
+  };
+
   // データ処理の関数
   const processData = (data) => {
     if (!data || data.length === 0) return; // dataが未定義または空の場合は処理を中止
@@ -55,9 +69,9 @@ const ScenarioForm = ({ headers, data, scenarioId, deleteScenario }) => {
 
     // BVの値に基づく処理
     if (row[bvIndex] === '1') {
-      responseText = `配送日は${row[kIndex]}です。`;
+      responseText = `配送日は${variables[kIndex] || row[kIndex]}です。`;
     } else if (row[bvIndex] === '2') {
-      responseText = `配送日は${row[kIndex]}ですが、確定ではありません。確定しますか？`;
+      responseText = `配送日は${variables[kIndex] || row[kIndex]}ですが、確定ではありません。確定しますか？`;
     }
 
     // 配送時間の確認
@@ -83,16 +97,13 @@ const ScenarioForm = ({ headers, data, scenarioId, deleteScenario }) => {
     // 配送オプション
     if (row[aaIndex] === '1') {
       responseText += ` 配送オプション: ${row[cbIndex] === '1' ? '玄関渡し' : '開梱'}`;
-    }
-
-    // AA列の値に基づく条件分岐
-    if (row[aaIndex] === '0') {
+    } else if (row[aaIndex] === '0') {
       responseText += ' 配送オプションはありません。';
     }
 
     // &シナリオの処理
     if (scenarioInput === 'input' && row[bvIndex] === '1') {
-      responseText += ` 変数B: ${row[kIndex]}が配送日となります。`;
+      responseText += ` 変数B: ${variables[kIndex] || row[kIndex]}が配送日となります。`;
     }
 
     setResponse(responseText);
@@ -109,11 +120,29 @@ const ScenarioForm = ({ headers, data, scenarioId, deleteScenario }) => {
         <h3>シナリオ {scenarioId}</h3>
         <button>{isExpanded ? '閉じる' : '開く'}</button>
       </div>
-
       {isExpanded && (
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-            {/* 「分岐させたい要素」テキスト入力 */}
+          {/* 変数の設定 */}
+          <div>
+            <h4>変数の設定:</h4>
+            <select onChange={(e) => handleVariableChange(e.target.value)} value={selectedVariable}>
+              <option value="" disabled>変数を選択</option>
+              {headers.map((header) => (
+                <option key={header} value={header}>
+                  {header}
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={manualInput}
+              onChange={handleVariableInputChange}
+              placeholder="手入力で変数を入力"
+            />
+          </div>
+
+          {/* 既存のコードの続き... */}
+          <div>
             <input
               type="text"
               value={selectedField}
@@ -123,7 +152,6 @@ const ScenarioForm = ({ headers, data, scenarioId, deleteScenario }) => {
               style={{ marginRight: '10px', flexGrow: 1 }}
             />
             <span style={{ marginRight: '10px' }}>が</span>
-            {/* 「必要な情報」プルダウン */}
             <select
               value={requiredInfo}
               onChange={handleRequiredInfoChange}
@@ -137,7 +165,6 @@ const ScenarioForm = ({ headers, data, scenarioId, deleteScenario }) => {
                 </option>
               ))}
             </select>
-            {/* 条件演算子プルダウン */}
             <select
               value={conditionOperator}
               onChange={handleConditionOperatorChange}
@@ -150,7 +177,6 @@ const ScenarioForm = ({ headers, data, scenarioId, deleteScenario }) => {
             </select>
           </div>
 
-          {/* シナリオの入力フィールド */}
           <textarea
             value={scenarioInput}
             onChange={handleScenarioInputChange}
@@ -159,20 +185,17 @@ const ScenarioForm = ({ headers, data, scenarioId, deleteScenario }) => {
             style={{ width: '100%', height: '100px', marginBottom: '10px' }}
           />
 
-          {/* ネストされたシナリオの表示 */}
           {nestedScenarios.map((nestedScenario) => (
             <ScenarioForm
               key={nestedScenario.id}
               headers={headers}
-              data={data} // dataを渡す
+              data={data}
               scenarioId={`${scenarioId}-${nestedScenario.id}`}
               deleteScenario={() => setNestedScenarios(nestedScenarios.filter(s => s.id !== nestedScenario.id))}
             />
           ))}
 
-          {/* トグル内に追加ボタンと削除ボタン */}
           <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end' }}>
-            {/* ボタンを重複させないようにし、トグルごとに追加されないよう修正 */}
             {nestedScenarios.length === 0 && (
               <>
                 <button type="button" onClick={() => deleteScenario(scenarioId)} className="delete-button" style={{ marginRight: '10px' }}>
@@ -185,7 +208,6 @@ const ScenarioForm = ({ headers, data, scenarioId, deleteScenario }) => {
             )}
           </div>
 
-          {/* シナリオの回答表示 */}
           <div>
             <h4>シナリオの回答:</h4>
             <p>{response}</p>

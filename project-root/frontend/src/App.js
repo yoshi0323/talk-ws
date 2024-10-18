@@ -4,60 +4,41 @@ import FileUpload from './components/FileUpload';
 import './index.css';
 
 function App() {
-  const [csvData, setCsvData] = useState({});
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [csvFilesData, setCsvFilesData] = useState([]); // 複数のCSVファイルのデータを保持
+  const [selectedFileIndex, setSelectedFileIndex] = useState(0); // 選択されたファイルのインデックス
   const [scenarios, setScenarios] = useState([]); // シナリオのリストを保持
 
   // 複数のCSVファイルをアップロードしたときの処理
-  const handleFileUpload = (files) => {
-    const fileDataPromises = files.map((file) => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          resolve({ name: file.name, content: reader.result });
-        };
-        reader.onerror = (error) => reject(error);
-        reader.readAsText(file);
-      });
-    });
-
-    // 各ファイルを処理してcsvDataに格納
-    Promise.all(fileDataPromises).then((fileContents) => {
-      const newCsvData = {};
-      fileContents.forEach((file) => {
-        const rows = file.content.split('\n');
-        const headers = rows[0].split(',');
-        const data = rows.slice(1).map((row) => row.split(','));
-        newCsvData[file.name] = { headers, data };
-      });
-      setCsvData(newCsvData);
-    });
+  const handleFileUpload = (fileData) => {
+    setCsvFilesData(prevData => [...prevData, fileData]); // 新しいファイルデータを追加
+    setSelectedFileIndex(csvFilesData.length); // 新しいファイルを選択
   };
 
   // プルダウンでファイル選択時のハンドラー
   const handleFileSelect = (event) => {
-    setSelectedFile(event.target.value);
+    setSelectedFileIndex(event.target.value);
   };
 
   // シナリオ削除のハンドラー
   const deleteScenario = (id) => {
-    setScenarios(scenarios.filter(scenario => scenario.id !== id));
+    setScenarios(scenarios.filter((_, index) => index !== id));
+  };
+
+  // シナリオ確定ボタンの処理
+  const handleConfirmScenario = () => {
+    const selectedFileData = csvFilesData[selectedFileIndex];
+    if (selectedFileData) {
+      alert(`シナリオが確定されました。選択されたファイル: ${selectedFileData.fileName}`);
+      // ここでシナリオの確定処理を追加できます
+    } else {
+      alert('ファイルが選択されていません。');
+    }
   };
 
   // 新しいシナリオを追加するハンドラー
   const addScenario = () => {
-    const newScenarioId = scenarios.length + 1;
-    setScenarios([...scenarios, { id: newScenarioId }]);
-  };
-
-  // 設定確定ボタンの処理
-  const handleConfirmSettings = () => {
-    if (selectedFile) {
-      alert(`設定が確定されました。選択されたファイル: ${selectedFile}`);
-      // 設定処理をここに追加
-    } else {
-      alert('ファイルが選択されていません。');
-    }
+    const newScenarioId = scenarios.length + 1; // 新しいシナリオのIDを生成
+    setScenarios([...scenarios, { id: newScenarioId }]); // 新しいシナリオを追加
   };
 
   return (
@@ -68,14 +49,13 @@ function App() {
       <FileUpload onFileUpload={handleFileUpload} />
 
       {/* プルダウンでファイルを選択 */}
-      {Object.keys(csvData).length > 0 && (
+      {csvFilesData.length > 0 && (
         <div>
           <label>アップロードしたファイルを選択してください:</label>
-          <select onChange={handleFileSelect} value={selectedFile || ''}>
-            <option value="" disabled>ファイルを選択</option>
-            {Object.keys(csvData).map((fileName) => (
-              <option key={fileName} value={fileName}>
-                {fileName}
+          <select onChange={handleFileSelect} value={selectedFileIndex}>
+            {csvFilesData.map((fileData, index) => (
+              <option key={index} value={index}>
+                {fileData.fileName}
               </option>
             ))}
           </select>
@@ -83,30 +63,35 @@ function App() {
       )}
 
       {/* 選択されたファイルの内容をシナリオに渡す */}
-      {selectedFile && (
-        <>
-          {scenarios.map((scenario, index) => (
-            <ScenarioForm
-              key={scenario.id}
-              headers={csvData[selectedFile].headers}
-              scenarioId={`シナリオ ${index + 1}`}
-              deleteScenario={deleteScenario}
-            />
-          ))}
-        </>
+      {csvFilesData.length > 0 && (
+        <ScenarioForm
+          headers={csvFilesData[selectedFileIndex].headers}
+          data={csvFilesData[selectedFileIndex].data}
+          scenarioId={`シナリオ ${selectedFileIndex + 1}`}
+          deleteScenario={deleteScenario}
+        />
       )}
 
-      {/* シナリオ追加ボタン */}
+      {/* シナリオ追加ボタンとシナリオ確定ボタン */}
       <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end' }}>
         <button type="button" onClick={addScenario} className="add-scenario-button">
           新しいシナリオを追加
         </button>
+        <button type="button" onClick={handleConfirmScenario} className="confirm-scenario-button" style={{ marginLeft: '10px' }}>
+          シナリオ確定
+        </button>
       </div>
 
-      {/* 設定確定ボタン */}
-      <div className="form-buttons fixed-buttons">
-        <button type="button" onClick={handleConfirmSettings}>設定確定</button>
-      </div>
+      {/* 追加されたシナリオのトグルを表示 */}
+      {scenarios.map((scenario) => (
+        <ScenarioForm
+          key={scenario.id}
+          headers={csvFilesData[selectedFileIndex].headers}
+          data={csvFilesData[selectedFileIndex].data}
+          scenarioId={`新しいシナリオ ${scenario.id}`}
+          deleteScenario={deleteScenario}
+        />
+      ))}
     </div>
   );
 }
